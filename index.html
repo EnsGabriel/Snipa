@@ -78,9 +78,9 @@ async function api(path,opt={}){
   if(!r.ok)throw new Error(j.detail||"Erro "+r.status);return j}
 
 let timer=null;
-const rotas={novo:vNovo,projetos:vProjetos,job:vJob};
+const rotas={live:vLive,novo:vNovo,projetos:vProjetos,job:vJob};
 function ir(){clearInterval(timer);const[,r,id]=location.hash.split("/");const n=rotas[r]?r:"novo";
-  $("#nav").replaceChildren(...[["novo","✂","Novo"],["projetos","▤","Projetos"]]
+  $("#nav").replaceChildren(...[["novo","✂","Novo"],["projetos","▤","Projetos"],["live","●","Live"]]
     .map(([k,ic,t])=>h("a",{href:"#/"+k,className:k===n?"on":""},h("b",{},ic),t)));
   $("#app").replaceChildren();rotas[n](id)}
 addEventListener("hashchange",ir);
@@ -152,6 +152,43 @@ function vNovo(){
     L.length?h("h3",{style:"margin-top:40px"},"Seus projetos recentes"):"",
     h("div",{className:"cards"},L.slice(0,6).map(p=>h("a",{className:"card",href:"#/job/"+p.id},
       h("b",{},p.titulo),h("span",{className:"s"},p.cortes+" cortes · "+new Date(p.quando).toLocaleDateString("pt-BR"))))))}
+
+function cardClip(c){const u=base()+c.url;
+  return h("div",{className:"clip"},h("video",{src:u,controls:true,preload:"metadata"}),
+    h("h4",{},"Bloco "+c.bloco+" · "+c.titulo),h("div",{className:"s m"},Math.round(c.fim-c.inicio)+" s · potencial "+c.score+"/10"),
+    c.legenda?h("p",{className:"s",style:"white-space:pre-wrap;background:var(--c);border:1px solid var(--b);border-radius:10px;padding:8px;margin:8px 0"},c.legenda):null,
+    c.legenda?h("button",{textContent:"Copiar legenda",style:"width:100%;margin-bottom:6px",on:{click:async e=>{try{await navigator.clipboard.writeText(c.legenda);e.target.textContent="Copiado ✓"}catch{e.target.textContent="Selecione e copie o texto acima"}}}}):null,
+    h("a",{className:"btn pr",href:u,textContent:"Baixar",style:"width:100%;margin-top:2px"}))}
+
+function vLive(){
+  const c=cfg(),lidr={id:null};
+  const msg=h("p",{className:"err",style:"text-align:center"}),st=h("p",{className:"m",style:"text-align:center"}),grade=h("div",{className:"grid"});
+  const url=h("input",{placeholder:"Link do canal ao vivo (ex.: https://kick.com/canal)"});
+  const bl=sel([[5,"Blocos de 5 min"],[10,"Blocos de 10 min"],[15,"Blocos de 15 min"]],10,"bl");
+  const nc=sel([1,2,3].map(n=>[n,n+" corte(s) por bloco"]),2,"nc");
+  const cr=sel([["amarelo","Destaque amarelo"],["laranja","Destaque laranja"],["verde","Destaque verde"],["azul","Destaque azul"]],"amarelo","cr");
+  const tm=sel([["pequeno","Letra pequena"],["medio","Letra média"],["grande","Letra grande"]],"medio","tm");
+  const ps=sel([["baixo","Legenda embaixo"],["centro","Legenda no centro"],["alto","Legenda no alto"]],"baixo","ps");
+  const ly=mkLay();
+  const parar=h("button",{textContent:"Parar monitoramento",style:"display:none",on:{click:async()=>{try{await api("/lives/"+lidr.id,{method:"DELETE"})}catch(e){msg.textContent=e.message}}}});
+  async function tick(){let j;try{j=await api("/lives/"+lidr.id)}catch(e){msg.textContent=e.message;return}
+    msg.textContent="";
+    st.textContent=({gravando:"● Gravando a live",offline:"Canal offline, tentando de novo…",encerrada:"Monitoramento encerrado"}[j.estado]||j.estado)+" · "+j.blocos+" bloco(s) gravado(s), "+j.prontos+" processado(s)";
+    grade.replaceChildren(...j.clips.map(cardClip));
+    if(j.estado==="encerrada"&&j.prontos>=j.blocos){clearInterval(timer);go.disabled=false;parar.style.display="none"}}
+  const go=h("button",{className:"cta",textContent:"Monitorar live",on:{click:async()=>{
+    msg.textContent="";const fd=new FormData();
+    fd.append("url",url.value.trim());fd.append("bloco",bl.value);fd.append("cortes",nc.value);fd.append("dmin",20);fd.append("dmax",60);
+    fd.append("whisper",c.whisper);fd.append("llm",c.llm);fd.append("idioma",c.idioma);fd.append("cor",cr.value);fd.append("tamanho",tm.value);fd.append("posicao",ps.value);fd.append("layout",ly.lay.value);fd.append("camera",ly.cam.value);
+    try{const r=await api("/lives",{method:"POST",body:fd});lidr.id=r.id;go.disabled=true;parar.style.display="";tick();timer=setInterval(tick,5000)}
+    catch(e){msg.textContent=e.message}}}});
+  $("#app").append(h("div",{className:"hero"},h("div",{className:"tag"},"// MONITOR DE LIVE"),
+      h("h1",{},"Cortes ",h("b",{style:"color:var(--p)"},"enquanto a live rola."))),
+    h("div",{className:"pill"},url,go),msg,
+    h("div",{className:"chips"},bl,nc,cr,tm,ps),
+    ly.lay,ly.cam,
+    h("p",{className:"s m",style:"text-align:center"},"A live é gravada em blocos; cada bloco vira cortes em poucos minutos. Use só em lives suas ou com autorização."),
+    h("div",{style:"text-align:center;margin:12px 0"},parar),st,grade)}
 
 const ETAPAS=[["Baixar vídeo",8],["Extrair áudio",15],["Transcrever",55],["Escolher cortes",60],["Renderizar",101]];
 function vJob(id){
