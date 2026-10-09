@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjI1NiIgaGVpZ2h0PSIyNTYiPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzhmNzBmZiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzQzMjZkOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxtYXNrIGlkPSJtIj4KICAgICAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZmZmIi8+CiAgICAgIDxsaW5lIHgxPSIyMiIgeTE9IjYyIiB4Mj0iNjIiIHkyPSIyMiIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPC9tYXNrPgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNiIgZmlsbD0idXJsKCNnKSIvPgogIDxnIG1hc2s9InVybCgjbSkiPgogICAgPHJlY3QgeD0iMjAiIHk9IjEwIiB3aWR0aD0iMjQiIGhlaWdodD0iNDQiIHJ4PSI3IiBmaWxsPSIjZmZmIi8+CiAgICA8cGF0aCBkPSJNMjggMjQuNWwxMSA3LjUtMTEgNy41eiIgZmlsbD0iIzViM2RmNSIvPgogIDwvZz4KICA8cGF0aCBkPSJNMC02LjVMMS43LTEuNyA2LjUgMCAxLjcgMS43IDAgNi41LTEuNyAxLjctNi41IDAtMS43LTEuN3oiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDUwIDQ3KSIgZmlsbD0iI2Y1Yjk0MiIvPgo8L3N2Zz4K">
+<title>Snipa · cortes automáticos</title>
+<style>
+:root{--p:#6c4cff;--bg:#141414;--c:#1e1e20;--c2:#262629;--t:#f2f2f3;--m:#9a9aa3;--b:#2f2f33;--y:#f5b942}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 system-ui,Segoe UI,sans-serif;color:var(--t);background:var(--bg);display:flex;min-height:100vh}
+aside{width:84px;border-right:1px solid var(--b);padding:16px 8px;display:flex;flex-direction:column;align-items:center;position:sticky;top:0;height:100vh}
+.logo .mk{display:block;width:44px;height:44px;margin:4px auto 6px}.logo span{display:block;font-size:13px;font-weight:800;text-align:center;margin:0 0 18px;letter-spacing:.01em}.logo span b{color:var(--y)}
+.logo i{display:none;margin-left:auto;margin-right:auto;width:16px;height:24px;background:var(--p);border-radius:4px 4px 9px 4px;margin:6px 0 18px}
+nav{display:flex;flex-direction:column;gap:4px;width:100%}
+nav a{color:var(--m);text-decoration:none;text-align:center;font-size:11px;padding:8px 2px;border-radius:10px}nav a b{display:block;font-size:20px;font-weight:400}
+nav a.on,nav a:hover{color:var(--t);background:var(--c2)}
+main{flex:1;min-width:0;max-width:960px;margin:0 auto;padding:40px 5vw 80px}
+h1{font-size:38px;line-height:1.1;margin:8px 0}h2{margin:0 0 4px}
+.tag{font:11px monospace;color:var(--p);letter-spacing:.08em}.m{color:var(--m)}.s{font-size:12px}
+.row{display:flex;gap:10px;margin:18px 0}input,select{width:100%;padding:11px 12px;border:1px solid var(--b);border-radius:10px;font:inherit;background:var(--c2);color:var(--t)}
+button,.btn{padding:11px 18px;border:1px solid var(--b);border-radius:10px;background:var(--c2);font:inherit;font-weight:600;cursor:pointer;text-decoration:none;color:var(--t);display:inline-block;text-align:center}
+.pr{background:var(--p);color:#fff;border-color:var(--p)}
+.box{background:var(--c);border:1px solid var(--b);border-radius:14px;padding:18px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.f label{display:block;font-size:11px;color:var(--m);margin:10px 0 4px}
+.steps{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--m)}.steps .ok{color:#9d8cff;font-weight:700}
+.bar{height:6px;background:var(--b);border-radius:9px;margin-top:12px;overflow:hidden}.bar div{height:100%;background:var(--p);transition:width .5s}
+.clip video{width:100%;aspect-ratio:9/16;background:#000;border-radius:12px;object-fit:cover}
+.clip h4{margin:8px 0 2px;font-size:13px}.err{color:#ff7b7b;font-weight:600}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border:1px solid var(--b);border-radius:12px;background:var(--c);margin:10px 0}
+.hint{background:#2b2512;border:1px solid var(--y);color:#f3e3b0;padding:10px 12px;border-radius:10px;font-size:12px;margin:12px 0}
+.hero{text-align:center;margin:56px 0 26px}
+.pill{display:flex;gap:8px;background:var(--c);border:1px solid var(--b);border-radius:18px;padding:8px;max-width:760px;margin:0 auto}
+.pill input{border:0;background:transparent;font-size:15px}.pill input:focus{outline:0}
+.cta{background:#fff;color:#111;border:0;border-radius:12px;padding:12px 20px;font-weight:700;white-space:nowrap}.cta:disabled{opacity:.6}
+.chips{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0}.chips select{width:auto;border-radius:999px;padding:8px 14px}.chips button{border-radius:999px;padding:8px 14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.card{background:linear-gradient(135deg,#2a2f4f,#171a2b);border:1px solid var(--b);border-radius:16px;padding:16px;min-height:130px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;text-decoration:none;color:#fff;word-break:break-word}
+@media(max-width:640px){body{flex-direction:column}aside{width:100%;height:auto;flex-direction:row;position:static;border-right:0;border-bottom:1px solid var(--b)}.logo{display:flex;align-items:center;gap:8px}.logo .mk{margin:0}.logo span{margin:0}nav{flex-direction:row}h1{font-size:30px}.pill{flex-direction:column}}
+.lays{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0 8px}
+.lay{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:10px 8px;width:100px;color:var(--m);font-size:11px;font-weight:500;cursor:pointer}
+.lay svg{display:block;margin:0 auto 7px;width:38px;height:68px}.lay.on{border-color:var(--p);color:var(--t);background:var(--c2)}
+.inset{display:flex;align-items:center}
+</style></head><body>
+<aside><div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="mk">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8f70ff"/><stop offset="1" stop-color="#4326d9"/>
+    </linearGradient>
+    <mask id="m">
+      <rect width="64" height="64" fill="#fff"/>
+      <line x1="22" y1="62" x2="62" y2="22" stroke="#000" stroke-width="5" stroke-linecap="round"/>
+    </mask>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#g)"/>
+  <g mask="url(#m)">
+    <rect x="20" y="10" width="24" height="44" rx="7" fill="#fff"/>
+    <path d="M28 24.5l11 7.5-11 7.5z" fill="#5b3df5"/>
+  </g>
+  <path d="M0-6.5L1.7-1.7 6.5 0 1.7 1.7 0 6.5-1.7 1.7-6.5 0-1.7-1.7z" transform="translate(50 47)" fill="#f5b942"/>
+</svg>
+<span>Sn<b>i</b>pa</span></div><nav id="nav"></nav></aside>
+<main id="app"></main>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+function h(tag,a={},...kids){const e=document.createElement(tag);
+  for(const[k,v]of Object.entries(a)){if(k==="on")for(const[ev,fn]of Object.entries(v))e.addEventListener(ev,fn);else if(k in e&&k!=="list")e[k]=v;else e.setAttribute(k,v)}
+  for(const c of kids.flat())if(c!=null)e.append(c.nodeType?c:document.createTextNode(c));return e}
+const store={
+  get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const BASE="https://gabriel-pc.tailbd72a3.ts.net";
+const cfg=()=>({whisper:"large-v3-turbo",llm:"llama3.1",idioma:"pt"});
+const base=()=>BASE;
+async function api(path,opt={}){
+  let r;try{r=await fetch(BASE+path,opt)}
+  catch{throw new Error("Não consegui falar com o servidor. Tente novamente em alguns minutos.")}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.detail||"Erro "+r.status);return j}
+
+let timer=null;
+const rotas={novo:vNovo,projetos:vProjetos,job:vJob};
+function ir(){clearInterval(timer);const[,r,id]=location.hash.split("/");const n=rotas[r]?r:"novo";
+  $("#nav").replaceChildren(...[["novo","✂","Novo"],["projetos","▤","Projetos"]]
+    .map(([k,ic,t])=>h("a",{href:"#/"+k,className:k===n?"on":""},h("b",{},ic),t)));
+  $("#app").replaceChildren();rotas[n](id)}
+addEventListener("hashchange",ir);
+
+function sel(opts,val,id){const s=h("select",{id});opts.forEach(([v,t])=>s.append(h("option",{value:v,textContent:t,selected:String(v)===String(val)})));return s}
+
+const IC={
+ preencher:'<rect width="36" height="64" fill="#6c4cff"/><path d="M14 26l10 6-10 6z" fill="#fff"/>',
+ inteiro:'<rect width="36" height="64" fill="#6c4cff" opacity=".3"/><rect y="22" width="36" height="20" fill="#6c4cff"/><path d="M15 27l8 5-8 5z" fill="#fff"/>',
+ metade:'<rect width="36" height="31" fill="#6c4cff"/><rect y="33" width="36" height="31" fill="#9d8cff"/><circle cx="18" cy="11" r="4" fill="#fff"/><path d="M9 31c0-6 4-9 9-9s9 3 9 9z" fill="#fff"/><circle cx="18" cy="43" r="4" fill="#fff"/><path d="M9 63c0-6 4-9 9-9s9 3 9 9z" fill="#fff"/>',
+ dividido:'<rect width="36" height="38" fill="#6c4cff"/><path d="M14 13l9 6-9 6z" fill="#fff"/><rect y="40" width="36" height="24" fill="#f5b942"/><circle cx="18" cy="49" r="4.5" fill="#14161f"/><path d="M9 64c0-6 4-9 9-9s9 3 9 9z" fill="#14161f"/>'};
+function mkLay(){
+  const defs=[["preencher","Preencher"],["inteiro","Inteiro"],["metade","Metade e metade"],["dividido","Jogo + câmera"]];
+  let cur="preencher";
+  const box=h("div",{className:"lays"});
+  Object.defineProperty(box,"value",{get:()=>cur});
+  const ico=(k,i)=>'<svg viewBox="0 0 36 64"><clipPath id="lc'+i+'"><rect width="36" height="64" rx="6"/></clipPath><g clip-path="url(#lc'+i+')">'+IC[k]+'</g></svg>';
+  const btns=defs.map(([k,t],i)=>{
+    const b=h("button",{className:"lay"+(k===cur?" on":""),type:"button",on:{click:()=>{cur=k;
+      btns.forEach((x,j)=>{x.className="lay"+(defs[j][0]===cur?" on":"")});camBox.style.display=cur==="dividido"?"flex":"none"}}});
+    b.innerHTML=ico(k,i);b.append(t);return b});
+  btns.forEach(x=>box.append(x));
+  const cs=sel([["baixo-direita","Câmera: canto inferior direito"],["baixo-esquerda","Câmera: canto inferior esquerdo"],["cima-direita","Câmera: canto superior direito"],["cima-esquerda","Câmera: canto superior esquerdo"]],"baixo-direita","cam");
+  const inset=h("div",{className:"inset"});
+  const desenhar=()=>{const[v,hz]=cs.value.split("-");const x=hz==="direita"?44:2,y=v==="baixo"?22:2;
+    inset.innerHTML='<svg viewBox="0 0 64 36" width="64" height="36"><rect x=".5" y=".5" width="63" height="35" rx="4" fill="none" stroke="#9a9aa3"/><rect x="'+x+'" y="'+y+'" width="18" height="12" rx="2" fill="#f5b942"/></svg>'};
+  cs.addEventListener("change",desenhar);desenhar();
+  const camBox=h("div",{className:"chips",style:"display:none;align-items:center;margin-top:0"},inset,cs);
+  Object.defineProperty(camBox,"value",{get:()=>cs.value});
+  return{lay:box,cam:camBox}}
+
+function vNovo(){
+  const c=cfg();let arq=null;
+  const url=h("input",{placeholder:"Cole o link do vídeo (YouTube e outros)",id:"url"});
+  const fi=h("input",{type:"file",accept:".mp4,.mov,.mkv,.webm,.avi,.m4v",hidden:true,on:{change:e=>pick(e.target.files[0])}});
+  const msg=h("p",{className:"err",style:"text-align:center"});
+  const pill=h("div",{className:"pill"});
+  function pick(f){if(!f)return;arq=f;url.value="";url.placeholder="Arquivo: "+f.name}
+  ["dragover","dragleave","drop"].forEach(ev=>pill.addEventListener(ev,e=>{e.preventDefault();pill.style.outline=ev==="dragover"?"2px dashed var(--p)":"";if(ev==="drop")pick(e.dataTransfer.files[0])}));
+  const q=sel([3,5,8,10].map(n=>[n,n+" cortes"]),5,"q");
+  const d=sel([["20-40","20 a 40 s"],["30-60","30 a 60 s"],["60-90","60 a 90 s"]],"30-60","d");
+  const i=sel([["pt","Português"],["en","Inglês"],["es","Espanhol"],["auto","Detectar idioma"]],c.idioma,"i");
+  const cr=sel([["amarelo","Destaque amarelo"],["laranja","Destaque laranja"],["verde","Destaque verde"],["azul","Destaque azul"]],"amarelo","cr");
+  const tm=sel([["pequeno","Letra pequena"],["medio","Letra média"],["grande","Letra grande"]],"medio","tm");
+  const ps=sel([["baixo","Legenda embaixo"],["centro","Legenda no centro"],["alto","Legenda no alto"]],"baixo","ps");
+  const ly=mkLay();
+  const go=h("button",{className:"cta",textContent:"Obter cortes em 1 clique",on:{click:async()=>{
+    msg.textContent="";
+    if(!arq&&!url.value.trim()){msg.textContent="Cole um link ou envie um arquivo.";return}
+    const[mn,mx]=d.value.split("-"),fd=new FormData();
+    if(arq)fd.append("arquivo",arq);else fd.append("url",url.value.trim());
+    fd.append("cortes",q.value);fd.append("dmin",mn);fd.append("dmax",mx);
+    fd.append("whisper",c.whisper);fd.append("llm",c.llm);fd.append("idioma",i.value);fd.append("cor",cr.value);fd.append("tamanho",tm.value);fd.append("posicao",ps.value);fd.append("layout",ly.lay.value);fd.append("camera",ly.cam.value);
+    go.disabled=true;
+    try{const r=await api("/jobs",{method:"POST",body:fd});
+      const L=store.get("jobs",[]);let t;try{t=arq?arq.name:new URL(url.value).hostname}catch{t="vídeo"}
+      L.unshift({id:r.id,titulo:t,quando:Date.now(),cortes:+q.value});store.set("jobs",L.slice(0,30));
+      location.hash="#/job/"+r.id}catch(e){msg.textContent=e.message;go.disabled=false}}}});
+  pill.append(url,go);
+  const L=store.get("jobs",[]);
+  $("#app").append(
+    h("div",{className:"hero"},h("div",{className:"tag"},"// SNIPA · CORTES · LEGENDAS · 9:16"),
+      h("h1",{},"Cole um link.",h("br"),"Receba os cortes ",h("b",{style:"color:var(--p)"},"prontos."))),
+    pill,msg,
+    h("div",{className:"chips"},h("button",{textContent:"⬆ Enviar arquivo",on:{click:()=>fi.click()}}),fi,q,d,i),
+    h("div",{className:"chips"},cr,tm,ps),
+    ly.lay,ly.cam,
+    h("p",{className:"s m",style:"text-align:center"},"Para vídeos grandes, prefira colar o link."),
+    L.length?h("h3",{style:"margin-top:40px"},"Seus projetos recentes"):"",
+    h("div",{className:"cards"},L.slice(0,6).map(p=>h("a",{className:"card",href:"#/job/"+p.id},
+      h("b",{},p.titulo),h("span",{className:"s"},p.cortes+" cortes · "+new Date(p.quando).toLocaleDateString("pt-BR"))))))}
+
+const ETAPAS=[["Baixar vídeo",8],["Extrair áudio",15],["Transcrever",55],["Escolher cortes",60],["Renderizar",101]];
+function vJob(id){
+  const topo=h("div",{}),passos=h("div",{className:"box"}),grade=h("div",{className:"grid"}),erro=h("p",{className:"err"});
+  $("#app").append(h("h2",{},"Seu projeto"),topo,passos,erro,grade,
+    h("p",{className:"s m"},"Baixe os clipes que quiser guardar: eles são apagados do servidor após 24 horas."));
+  async function tick(){
+    let j;try{j=await api("/jobs/"+id)}catch(e){erro.textContent=e.message;return}
+    erro.textContent="";const p=j.progresso||0;
+    topo.textContent=j.estado==="concluido"?"Pronto!":j.estado==="erro"?"":(j.etapa||"Na fila")+"…";
+    const st=h("div",{className:"steps"});
+    ETAPAS.forEach(([n,lim],k)=>{const ant=k?ETAPAS[k-1][1]:0;
+      st.append(h("span",{className:j.estado==="concluido"||p>=lim?"ok":""},(j.estado==="concluido"||p>=lim?"✓ ":p>=ant?"● ":"○ ")+n))});
+    passos.replaceChildren(st,h("div",{className:"bar"},h("div",{style:"width:"+(j.estado==="concluido"?100:p)+"%"})));
+    if(j.estado==="erro"){erro.textContent=j.erro||"Falhou.";clearInterval(timer)}
+    if(j.estado==="concluido"){clearInterval(timer);
+      grade.replaceChildren(...j.clips.map((c,n)=>{const u=base()+c.url;
+        return h("div",{className:"clip"},h("video",{src:u,controls:true,preload:"metadata"}),
+          h("h4",{},"Corte "+(n+1)+" · "+c.titulo),
+          h("div",{className:"s m"},Math.round(c.fim-c.inicio)+" s · potencial "+c.score+"/10"),
+          c.legenda?h("p",{className:"s",style:"white-space:pre-wrap;background:var(--c);border:1px solid var(--b);border-radius:10px;padding:8px;margin:8px 0"},c.legenda):null,
+          c.legenda?h("button",{textContent:"Copiar legenda",style:"width:100%;margin-bottom:6px",on:{click:async e=>{try{await navigator.clipboard.writeText(c.legenda);e.target.textContent="Copiado ✓"}catch{e.target.textContent="Selecione e copie o texto acima"}}}}):null,
+          h("a",{className:"btn pr",href:u,textContent:"Baixar",style:"width:100%;margin-top:2px"}))}))}}
+  tick();timer=setInterval(tick,3000)}
+
+function vProjetos(){
+  const L=store.get("jobs",[]);const box=h("div");
+  $("#app").append(h("h2",{},"Meus projetos"),h("p",{className:"s m"},"Neste navegador. Clipes são apagados do servidor após 24 horas."),box);
+  if(!L.length)box.append(h("p",{className:"m"},"Nenhum projeto ainda."));
+  L.forEach(p=>box.append(h("div",{className:"item"},
+    h("div",{},h("b",{},p.titulo),h("div",{className:"s m"},p.cortes+" cortes · "+new Date(p.quando).toLocaleString("pt-BR"))),
+    h("div",{},h("a",{className:"btn",href:"#/job/"+p.id,textContent:"Abrir"})," ",
+      h("button",{textContent:"Apagar",on:{click:async()=>{try{await api("/jobs/"+p.id,{method:"DELETE"})}catch{}
+        store.set("jobs",store.get("jobs",[]).filter(x=>x.id!==p.id));ir()}}})))))}
+
+ir();
+</script></body></html>
