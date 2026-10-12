@@ -30,6 +30,15 @@ from urllib.parse import urlparse
 
 FONTE = "Arial"  # no Linux, troque por "Liberation Sans" ou instale a fonte
 
+# opcoes de estilo (a ordem das cores ASS e BGR, nao RGB)
+LAYOUTS = {"preencher", "inteiro", "metade", "dividido"}
+CAMERAS = {"baixo-direita", "baixo-esquerda", "cima-direita", "cima-esquerda"}
+CORES = {"amarelo": "&H00FFFF&", "laranja": "&H008CFF&", "verde": "&H84DC3D&", "azul": "&HFFA53D&"}
+TAMANHOS = {"pequeno": 72, "medio": 88, "grande": 108}
+POSICOES = {"baixo": (2, 520), "centro": (5, 0), "alto": (8, 300)}  # (alinhamento ASS, margem)
+ESTILO_PADRAO = {"layout": "preencher", "camera": "baixo-direita", "cor": "amarelo",
+                 "tamanho": "medio", "posicao": "baixo"}
+
 
 # ----------------------------------------------------------------------------
 # CUDA no Windows: registra as DLLs instaladas pelo pip (pacotes nvidia-*-cu12)
@@ -364,11 +373,20 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,__FONTE__,88,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,6,2,2,60,60,520,1
+Style: Default,__FONTE__,__TAM__,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,6,2,__ALIN__,60,60,__MV__,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
+
+
+def estilo_valido(e):
+    r = dict(ESTILO_PADRAO)
+    r.update({k: v for k, v in (e or {}).items() if k in r})
+    if not (r["layout"] in LAYOUTS and r["camera"] in CAMERAS and r["cor"] in CORES
+            and r["tamanho"] in TAMANHOS and r["posicao"] in POSICOES):
+        falhar("Opcao de estilo invalida.")
+    return r
 
 
 def tempo_ass(t):
@@ -379,7 +397,10 @@ def tempo_ass(t):
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def gerar_ass(segmentos, inicio, fim, caminho):
+def gerar_ass(segmentos, inicio, fim, caminho, estilo=None):
+    est = estilo_valido(estilo)
+    alin, mv = POSICOES[est["posicao"]]
+    cor = CORES[est["cor"]]
     palavras = [
         w for seg in segmentos for w in seg["words"]
         if w["s"] >= inicio - 0.05 and w["e"] <= fim + 0.05
@@ -393,7 +414,9 @@ def gerar_ass(segmentos, inicio, fim, caminho):
     if atual:
         grupos.append(atual)
 
-    linhas = [ASS_CABECALHO.replace("__FONTE__", FONTE)]
+    cab = (ASS_CABECALHO.replace("__FONTE__", FONTE).replace("__TAM__", str(TAMANHOS[est["tamanho"]]))
+           .replace("__ALIN__", str(alin)).replace("__MV__", str(mv)))
+    linhas = [cab]
     for g in grupos:
         for i, w in enumerate(g):
             t0 = w["s"] - inicio
@@ -404,7 +427,7 @@ def gerar_ass(segmentos, inicio, fim, caminho):
             for j, x in enumerate(g):
                 txt = re.sub(r"[{}\\]", "", x["w"]).upper()  # evita comandos ASS no texto
                 if j == i:
-                    partes.append("{\\c&H00FFFF&}" + txt + "{\\c&HFFFFFF&}")
+                    partes.append("{\\c" + cor + "}" + txt + "{\\c&HFFFFFF&}")
                 else:
                     partes.append(txt)
             linhas.append(
@@ -415,12 +438,42 @@ def gerar_ass(segmentos, inicio, fim, caminho):
 # ----------------------------------------------------------------------------
 # 5) render (ffmpeg): corta, 9:16, legenda queimada
 # ----------------------------------------------------------------------------
-def renderizar(video, ini, fim, ass_nome, saida, pasta):
+def montar_filtro(est, ass_nome, tem_foto):
+    lay, cam = est["layout"], est["camera"]
+    if lay == "inteiro":  # video inteiro no meio, fundo desfocado
+        base = ("[0:v]split=2[a][b];"
+                "[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5[bg];"
+                "[b]scale=1080:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[base]")
+    elif lay == "metade":  # metade esquerda em cima, metade direita embaixo
+        alt = "iw/2*960/1080"
+        base = ("[0:v]split=2[l][r];"
+                f"[l]crop=iw/2:{alt}:0:(ih-{alt})/2,scale=1080:960[t];"
+                f"[r]crop=iw/2:{alt}:iw/2:(ih-{alt})/2,scale=1080:960[u];"
+                "[t][u]vstack[base]")
+    elif lay == "dividido":  # jogo em cima, camera (canto do video) embaixo
+        x = "iw-iw*0.28" if cam.endswith("direita") else "0"
+        y = "ih-iw*0.28*780/1080" if cam.startswith("baixo") else "0"
+        base = ("[0:v]split=2[g][c];"
+                "[g]crop=ih*1080/1140:ih,scale=1080:1140[gt];"
+                f"[c]crop=iw*0.28:iw*0.28*780/1080:{x}:{y},scale=1080:780[cb];"
+                "[gt][cb]vstack[base]")
+    else:  # preencher
+        base = r"[0:v]crop=min(iw\,ih*9/16):min(ih\,iw*16/9),scale=1080:1920[base]"
+    fim = f"[base]setsar=1,format=yuv420p,ass={ass_nome}"
+    if tem_foto:  # foto no rodape, centralizada
+        return (base + ";" + fim + "[sub];[1:v]scale=960:380:force_original_aspect_ratio=decrease[img];"
+                "[sub][img]overlay=(W-w)/2:H-h-80:format=auto,format=yuv420p[v]")
+    return base + ";" + fim + "[v]"
+
+
+def renderizar(video, ini, fim, ass_nome, saida, pasta, estilo=None, foto=None):
     # roda dentro da pasta de saida para o caminho do .ass ser relativo
-    vf = (r"crop=min(iw\,ih*9/16):min(ih\,iw*16/9),"
-          r"scale=1080:1920,setsar=1,format=yuv420p,ass=" + ass_nome)
-    base = ["ffmpeg", "-y", "-ss", f"{ini:.2f}", "-i", str(video),
-            "-t", f"{fim - ini:.2f}", "-vf", vf]
+    est = estilo_valido(estilo)
+    fc = montar_filtro(est, ass_nome, bool(foto))
+    base = ["ffmpeg", "-y", "-ss", f"{ini:.2f}", "-i", str(video)]
+    if foto:
+        base += ["-loop", "1", "-i", str(foto)]
+    base += ["-t", f"{fim - ini:.2f}", "-filter_complex", fc, "-map", "[v]", "-map", "0:a?"]
     fim_cmd = ["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(saida)]
     nvenc = base + ["-c:v", "h264_nvenc", "-preset", "p5", "-cq", "23", "-b:v", "0"] + fim_cmd
     r = rodar(nvenc, cwd=pasta, timeout=900)
@@ -434,11 +487,28 @@ def renderizar(video, ini, fim, ass_nome, saida, pasta):
     return True
 
 
+def refazer_corte(video, pasta, i, ini, fim, estilo, foto, whisper, idioma):
+    """Renderiza de novo um corte ja existente (outro inicio/fim, modelo, legenda ou foto)."""
+    cache = pasta / f"transcricao_{nome_seguro(whisper)}_{nome_seguro(idioma)}.json"
+    if not cache.exists():
+        falhar("A transcricao deste projeto nao esta mais disponivel.")
+    segmentos = json.loads(cache.read_text(encoding="utf-8"))
+    est = estilo_valido(estilo)
+    nome_ass, nome_mp4, tmp = f"clip_{i:02d}.ass", f"clip_{i:02d}.mp4", f"edit_{i:02d}.mp4"
+    gerar_ass(segmentos, ini, fim, pasta / nome_ass, est)
+    if not renderizar(video, ini, fim, nome_ass, pasta / tmp, pasta, est, foto):
+        falhar("Nao consegui refazer o corte.")
+    os.replace(pasta / tmp, pasta / nome_mp4)  # so troca o antigo se o novo ficou pronto
+    return {"inicio": round(ini, 1), "fim": round(fim, 1), "estilo": est,
+            "foto": foto.name if foto else ""}
+
+
 # ----------------------------------------------------------------------------
 # pipeline completo (usado pelo CLI e pelo servidor)
 # ----------------------------------------------------------------------------
 def processar(video, pasta, n, dmin, dmax, whisper="medium", llm="llama3.1",
-              idioma="pt", etapa=None):
+              idioma="pt", etapa=None, estilo=None, foto=None):
+    est = estilo_valido(estilo)
     etapa = etapa or (lambda nome, pct: None)
     tempos, t0 = {}, time.time()
 
@@ -468,12 +538,13 @@ def processar(video, pasta, n, dmin, dmax, whisper="medium", llm="llama3.1",
     for i, c in enumerate(cortes, 1):
         etapa(f"Renderizando corte {i}/{len(cortes)}", 60 + int(38 * (i - 1) / len(cortes)))
         nome_ass, nome_mp4 = f"clip_{i:02d}.ass", f"clip_{i:02d}.mp4"
-        gerar_ass(segmentos, c["start"], c["end"], pasta / nome_ass)
+        gerar_ass(segmentos, c["start"], c["end"], pasta / nome_ass, est)
         print(f"[{i}/{len(cortes)}] {c['title']}  ({c['start']:.1f}s -> {c['end']:.1f}s)")
-        if renderizar(video, c["start"], c["end"], nome_ass, pasta / nome_mp4, pasta):
+        if renderizar(video, c["start"], c["end"], nome_ass, pasta / nome_mp4, pasta, est, foto):
             resultado.append({"arquivo": nome_mp4, "titulo": c["title"],
                               "inicio": round(c["start"], 1), "fim": round(c["end"], 1),
-                              "score": c["score"]})
+                              "score": c["score"], "estilo": est,
+                              "foto": foto.name if foto else ""})
             print("  pronto")
         else:
             print("  falhou")
