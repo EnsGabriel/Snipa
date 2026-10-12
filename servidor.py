@@ -10,11 +10,7 @@ Seguranca embutida:
   - links: so http/https e sem enderecos internos (anti-SSRF)
   - modelos de Whisper/LLM em lista fechada
   - IDs aleatorios; downloads por link assinado que expira em 1 h
-<<<<<<< HEAD
   - apaga tudo (inclusive o video original, usado para editar cortes) apos X horas
-=======
-  - apaga o video original ao terminar e tudo apos X horas
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
   - nao grava links nem chaves em log
 """
 import hashlib
@@ -50,23 +46,16 @@ ORIGENS = [o.strip() for o in os.getenv("CORTES_ORIGENS", "").split(",") if o.st
 DADOS = Path(os.getenv("CORTES_DADOS", "dados")).resolve()
 MAX_UPLOAD = int(os.getenv("CORTES_MAX_UPLOAD_MB", "2048")) * 1024 * 1024
 RETENCAO_H = float(os.getenv("CORTES_RETENCAO_HORAS", "24"))
-<<<<<<< HEAD
 # 0 = guarda o original ate a retencao acabar (necessario para editar cortes depois)
 APAGAR_ORIGINAL = os.getenv("CORTES_APAGAR_ORIGINAL", "0") == "1"
-=======
-APAGAR_ORIGINAL = os.getenv("CORTES_APAGAR_ORIGINAL", "1") == "1"
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
 MAX_JOBS_HORA = int(os.getenv("CORTES_MAX_JOBS_HORA", "10"))
 MAX_FILA = int(os.getenv("CORTES_MAX_FILA", "5"))
 MAX_HORAS_VIDEO = float(os.getenv("CORTES_MAX_HORAS_VIDEO", "4"))
 WHISPER_OK = {"small", "medium", "large-v3", "large-v3-turbo"}
 LLM_OK = {m.strip() for m in os.getenv("CORTES_LLMS", "llama3.1,qwen2.5:7b").split(",") if m.strip()}
 EXT_OK = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
-<<<<<<< HEAD
 EXT_IMG = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_IMG = 10 * 1024 * 1024
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
 ID_RE = re.compile(r"[0-9a-f]{32}")
 NOME_RE = re.compile(r"clip_[0-9]{2}\.mp4")
 MAX_DIA = int(os.getenv("CORTES_MAX_JOBS_DIA", "40"))
@@ -97,10 +86,7 @@ class Janela:
 
 CRIACOES = Janela(MAX_JOBS_HORA, 3600)  # por IP
 TOTAL_DIA = Janela(MAX_DIA, 86400)      # total de todos, protege a placa
-<<<<<<< HEAD
 EDICOES = Janela(int(os.getenv("CORTES_MAX_EDICOES_HORA", "30")), 3600)  # por IP
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
 
 
 def ip_cliente(req: Request):
@@ -138,15 +124,10 @@ def visao_publica(j):
     if j["estado"] == "concluido":
         exp = int(time.time()) + 3600
         for c in j.get("clips", []):
-<<<<<<< HEAD
             clips.append({**{k: v for k, v in c.items() if k != "foto"},
                           "tem_foto": bool(c.get("foto")),
                           "url": f"/baixar/{j['id']}/{c['arquivo']}?exp={exp}"
                                  f"&sig={assinar(j['id'], c['arquivo'], exp)}&v={c.get('v', 0)}"})
-=======
-            clips.append({**c, "url": f"/baixar/{j['id']}/{c['arquivo']}?exp={exp}"
-                                       f"&sig={assinar(j['id'], c['arquivo'], exp)}"})
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
     return {"id": j["id"], "estado": j["estado"], "etapa": j.get("etapa", ""),
             "progresso": j.get("progresso", 0), "erro": j.get("erro", ""), "clips": clips}
 
@@ -164,17 +145,11 @@ def executar(jid):
             video = next(pasta.glob("original.*"))
         vc.verificar_midia(video, MAX_HORAS_VIDEO)
         p = j["params"]
-<<<<<<< HEAD
         foto = next(pasta.glob("foto_job.*"), None)
         res = vc.processar(
             video, pasta, p["cortes"], p["dmin"], p["dmax"], p["whisper"], p["llm"], p["idioma"],
             etapa=lambda nome, pct: gravar(jid, etapa=nome, progresso=pct),
             estilo=p.get("estilo"), foto=foto,
-=======
-        res = vc.processar(
-            video, pasta, p["cortes"], p["dmin"], p["dmax"], p["whisper"], p["llm"], p["idioma"],
-            etapa=lambda nome, pct: gravar(jid, etapa=nome, progresso=pct),
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
         )
         gravar(jid, estado="concluido", etapa="Pronto", progresso=100, clips=res["cortes"])
     except vc.ErroCortes as e:
@@ -193,7 +168,6 @@ def executar(jid):
                     pass
 
 
-<<<<<<< HEAD
 def executar_edicao(jid, n, dados):
     """Refaz o corte n (1, 2, ...) com novos ajustes. O job continua 'concluido'."""
     pasta = DADOS / jid
@@ -232,13 +206,6 @@ def trabalhador():
                 executar_edicao(*tarefa[1:])
             else:
                 executar(tarefa)
-=======
-def trabalhador():
-    while True:
-        jid = FILA.get()
-        try:
-            executar(jid)
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
         finally:
             FILA.task_done()
 
@@ -275,12 +242,9 @@ async def ciclo(app):
                 j = json.loads(st.read_text(encoding="utf-8"))
                 if j.get("estado") in ("fila", "processando"):
                     j.update(estado="erro", erro="O servidor foi reiniciado durante o processamento.")
-<<<<<<< HEAD
                 for c in j.get("clips", []):
                     if c.get("refazendo"):
                         c.update(refazendo=False, erro_edicao="O servidor foi reiniciado durante a edicao.")
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
                 JOBS[pasta.name] = j
             except (OSError, json.JSONDecodeError):
                 pass
@@ -310,7 +274,6 @@ async def cabecalhos(request: Request, call_next):
     return resp
 
 
-<<<<<<< HEAD
 def validar_estilo(layout, camera, cor, tamanho, posicao):
     est = {"layout": layout, "camera": camera, "cor": cor, "tamanho": tamanho, "posicao": posicao}
     try:
@@ -336,8 +299,6 @@ def salvar_imagem(arquivo, destino_sem_ext):
     return destino
 
 
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
 @app.get("/saude")
 def saude():
     return {"ok": True}
@@ -354,15 +315,12 @@ def criar_job(
     whisper: str = Form("medium"),
     llm: str = Form("llama3.1"),
     idioma: str = Form("pt"),
-<<<<<<< HEAD
     layout: str = Form("preencher"),
     camera: str = Form("baixo-direita"),
     cor: str = Form("amarelo"),
     tamanho: str = Form("medio"),
     posicao: str = Form("baixo"),
     imagem: Optional[UploadFile] = File(None),
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
 ):
     ip = ip_cliente(req)
     if CRIACOES.cheia(ip):
@@ -377,10 +335,7 @@ def criar_job(
         raise HTTPException(400, "Opcao invalida.")
     if FILA.qsize() >= MAX_FILA:
         raise HTTPException(503, "Fila cheia. Tente novamente em alguns minutos.")
-<<<<<<< HEAD
     estilo = validar_estilo(layout, camera, cor, tamanho, posicao)
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
 
     if url.strip():
         try:
@@ -411,7 +366,6 @@ def criar_job(
     else:
         ENTRADAS[jid] = url
 
-<<<<<<< HEAD
     try:
         salvar_imagem(imagem, pasta / "foto_job")
     except HTTPException:
@@ -419,20 +373,14 @@ def criar_job(
         ENTRADAS.pop(jid, None)
         raise
 
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
     CRIACOES.registrar(ip)
     TOTAL_DIA.registrar("todos")
     with TRAVA:
         JOBS[jid] = {"id": jid, "estado": "fila", "etapa": "Na fila", "progresso": 0,
                      "criado_em": time.time(),
                      "params": {"cortes": cortes, "dmin": dmin, "dmax": dmax,
-<<<<<<< HEAD
                                 "whisper": whisper, "llm": llm, "idioma": idioma,
                                 "estilo": estilo}}
-=======
-                                "whisper": whisper, "llm": llm, "idioma": idioma}}
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
     gravar(jid)
     FILA.put(jid)
     log.info("job %s criado", jid)
@@ -446,7 +394,6 @@ def ver_job(jid: str):
     return visao_publica(JOBS[jid])
 
 
-<<<<<<< HEAD
 @app.post("/jobs/{jid}/cortes/{n}/refazer", status_code=202)
 def refazer(
     jid: str, n: int, req: Request,
@@ -495,8 +442,6 @@ def refazer(
     return {"ok": True}
 
 
-=======
->>>>>>> d3e48b7c8976f262e51eec0d43f2eae9c5cb815a
 @app.delete("/jobs/{jid}")
 def apagar_job(jid: str):
     if not ID_RE.fullmatch(jid) or jid not in JOBS:
