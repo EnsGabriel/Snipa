@@ -29,12 +29,14 @@ from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
+import editor_render as ed
 import video_cortes as vc
 
 load_dotenv()
@@ -56,6 +58,7 @@ LLM_OK = {m.strip() for m in os.getenv("CORTES_LLMS", "llama3.1,qwen2.5:7b").spl
 EXT_OK = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
 EXT_IMG = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_IMG = 10 * 1024 * 1024
+MAX_DL_MB = int(os.getenv("CORTES_MAX_DOWNLOAD_MB", "1024"))
 ID_RE = re.compile(r"[0-9a-f]{32}")
 NOME_RE = re.compile(r"clip_[0-9]{2}\.mp4")
 MAX_DIA = int(os.getenv("CORTES_MAX_JOBS_DIA", "40"))
@@ -86,6 +89,7 @@ class Janela:
 
 CRIACOES = Janela(MAX_JOBS_HORA, 3600)  # por IP
 TOTAL_DIA = Janela(MAX_DIA, 86400)      # total de todos, protege a placa
+DOWNLOADS = Janela(int(os.getenv("CORTES_MAX_DOWNLOADS_HORA", "10")), 3600)  # por IP
 EDICOES = Janela(int(os.getenv("CORTES_MAX_EDICOES_HORA", "30")), 3600)  # por IP
 
 
@@ -102,6 +106,7 @@ JOBS = {}
 ENTRADAS = {}  # links ficam so na memoria (nunca em disco/log)
 TRAVA = threading.Lock()
 FILA = queue.Queue()
+FILA_DL = queue.Queue()  # downloads nao usam a GPU, entao tem fila propria
 
 
 def gravar(jid, **campos):
@@ -128,7 +133,7 @@ def visao_publica(j):
                           "tem_foto": bool(c.get("foto")),
                           "url": f"/baixar/{j['id']}/{c['arquivo']}?exp={exp}"
                                  f"&sig={assinar(j['id'], c['arquivo'], exp)}&v={c.get('v', 0)}"})
-    return {"id": j["id"], "estado": j["estado"], "etapa": j.get("etapa", ""),
+    return {"id": j["id"], "tipo": j.get("params", {}).get("tipo", "cortes"), "estado": j["estado"], "etapa": j.get("etapa", ""),
             "progresso": j.get("progresso", 0), "erro": j.get("erro", ""), "clips": clips}
 
 
@@ -168,6 +173,49 @@ def executar(jid):
                     pass
 
 
+def executar_download(jid):
+    """Baixa o video completo de um link (TikTok, Instagram, YouTube...) e deixa pronto para baixar."""
+    pasta = DADOS / jid
+    try:
+        gravar(jid, estado="processando", etapa="Baixando o video", progresso=10)
+        video = vc.baixar_url(ENTRADAS.pop(jid), pasta, max_mb=MAX_DL_MB, timeout=1800)
+        dur = vc.verificar_midia(video, MAX_HORAS_VIDEO)
+        gravar(jid, etapa="Preparando o arquivo", progresso=80)
+        saida = pasta / "clip_01.mp4"
+        base = ["ffmpeg", "-y", "-i", str(video)]
+        r = vc.rodar(base + ["-c", "copy", "-movflags", "+faststart", str(saida)], cwd=pasta, timeout=900)
+        if r.returncode != 0:  # formato incompativel com mp4: converte
+            r = vc.rodar(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-c:a", "aac",
+                                 "-movflags", "+faststart", str(saida)], cwd=pasta, timeout=3600)
+        if r.returncode != 0:
+            vc.falhar("Nao consegui preparar o arquivo para download.", r.stderr[-300:])
+        clips = [{"arquivo": "clip_01.mp4", "titulo": JOBS[jid]["params"].get("titulo", "Video"),
+                  "inicio": 0, "fim": round(dur, 1), "score": 0, "estilo": {}, "foto": ""}]
+        gravar(jid, estado="concluido", etapa="Pronto", progresso=100, clips=clips)
+    except vc.ErroCortes as e:
+        log.warning("download %s falhou: %s | %s", jid, e.msg, e.detalhe[:200])
+        gravar(jid, estado="erro", erro=e.msg)
+    except Exception:
+        log.exception("download %s: erro inesperado", jid)
+        gravar(jid, estado="erro", erro="Erro interno ao baixar o video.")
+    finally:
+        ENTRADAS.pop(jid, None)
+        for f in pasta.glob("original.*"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+
+def trabalhador_dl():
+    while True:
+        jid = FILA_DL.get()
+        try:
+            executar_download(jid)
+        finally:
+            FILA_DL.task_done()
+
+
 def executar_edicao(jid, n, dados):
     """Refaz o corte n (1, 2, ...) com novos ajustes. O job continua 'concluido'."""
     pasta = DADOS / jid
@@ -198,11 +246,29 @@ def marcar_edicao(jid, n, erro):
     gravar(jid, clips=clips)
 
 
+def executar_editor(jid, proj, p):
+    pasta = DADOS / jid
+    try:
+        gravar(jid, estado="processando", etapa="Renderizando o video", progresso=30)
+        ed.renderizar(DADOS / proj, pasta, p)
+        gravar(jid, estado="concluido", etapa="Pronto", progresso=100,
+               clips=[{"arquivo": "clip_01.mp4", "titulo": "Video editado", "inicio": 0,
+                       "fim": round(p["total"], 1), "score": 0, "estilo": {}, "foto": ""}])
+    except vc.ErroCortes as e:
+        log.warning("editor %s falhou: %s | %s", jid, e.msg, e.detalhe[:200])
+        gravar(jid, estado="erro", erro=e.msg)
+    except Exception:
+        log.exception("editor %s: erro inesperado", jid)
+        gravar(jid, estado="erro", erro="Erro interno ao renderizar o projeto.")
+
+
 def trabalhador():
     while True:
         tarefa = FILA.get()
         try:
-            if isinstance(tarefa, tuple):
+            if isinstance(tarefa, tuple) and tarefa[0] == "editor":
+                executar_editor(*tarefa[1:])
+            elif isinstance(tarefa, tuple):
                 executar_edicao(*tarefa[1:])
             else:
                 executar(tarefa)
@@ -249,6 +315,7 @@ async def ciclo(app):
             except (OSError, json.JSONDecodeError):
                 pass
     threading.Thread(target=trabalhador, daemon=True).start()
+    threading.Thread(target=trabalhador_dl, daemon=True).start()
     threading.Thread(target=faxineiro, daemon=True).start()
     log.info("Servidor pronto. Dados em %s", DADOS)
     yield
@@ -387,6 +454,86 @@ def criar_job(
     return {"id": jid}
 
 
+@app.post("/downloads", status_code=202)
+def criar_download(req: Request, url: str = Form(...)):
+    ip = ip_cliente(req)
+    if DOWNLOADS.cheia(ip):
+        raise HTTPException(429, "Limite de downloads por hora atingido.")
+    if FILA_DL.qsize() >= MAX_FILA:
+        raise HTTPException(503, "Fila cheia. Tente novamente em alguns minutos.")
+    try:
+        url = vc.validar_url(url)
+    except vc.ErroCortes as e:
+        raise HTTPException(400, e.msg)
+    jid = uuid.uuid4().hex
+    (DADOS / jid).mkdir(parents=True)
+    ENTRADAS[jid] = url
+    DOWNLOADS.registrar(ip)
+    with TRAVA:
+        JOBS[jid] = {"id": jid, "estado": "fila", "etapa": "Na fila", "progresso": 0,
+                     "criado_em": time.time(),
+                     "params": {"tipo": "download", "titulo": urlparse(url).hostname or "Video"}}
+    gravar(jid)
+    FILA_DL.put(jid)
+    log.info("download %s criado", jid)
+    return {"id": jid}
+
+
+@app.post("/editor/midia")
+def editor_midia(req: Request, arquivo: UploadFile = File(...), projeto: str = Form("")):
+    ip = ip_cliente(req)
+    if EDICOES.cheia(ip):
+        raise HTTPException(429, "Limite de envios por hora atingido.")
+    if projeto and not ID_RE.fullmatch(projeto):
+        raise HTTPException(400, "Projeto invalido.")
+    ext = Path(arquivo.filename or "").suffix.lower()
+    if ext not in ed.EXT_VIDEO | ed.EXT_IMG | ed.EXT_AUDIO:
+        raise HTTPException(400, "Formato nao permitido.")
+    projeto = projeto or uuid.uuid4().hex
+    pasta = DADOS / projeto
+    pasta.mkdir(parents=True, exist_ok=True)
+    nome, total = f"m_{secrets.token_hex(4)}{ext}", 0
+    with open(pasta / nome, "wb") as f:
+        while chunk := arquivo.file.read(1024 * 1024):
+            total += len(chunk)
+            if total > MAX_UPLOAD:
+                f.close()
+                (pasta / nome).unlink(missing_ok=True)
+                raise HTTPException(413, "Arquivo grande demais.")
+            f.write(chunk)
+    EDICOES.registrar(ip)
+    return {"projeto": projeto, "midia": nome}
+
+
+@app.post("/editor/exportar", status_code=202)
+async def editor_exportar(req: Request):
+    ip = ip_cliente(req)
+    if EDICOES.cheia(ip):
+        raise HTTPException(429, "Limite de exportacoes por hora atingido.")
+    if FILA.qsize() >= MAX_FILA:
+        raise HTTPException(503, "Fila cheia. Tente novamente em alguns minutos.")
+    try:
+        dados = await req.json()
+        proj = str(dados.get("projeto", ""))
+    except Exception:
+        raise HTTPException(400, "Projeto invalido.")
+    if not ID_RE.fullmatch(proj) or not (DADOS / proj).is_dir():
+        raise HTTPException(404, "Projeto nao encontrado. Importe as midias de novo.")
+    try:
+        p = ed.limpar(dados)
+    except vc.ErroCortes as e:
+        raise HTTPException(400, e.msg)
+    jid = uuid.uuid4().hex
+    (DADOS / jid).mkdir(parents=True)
+    EDICOES.registrar(ip)
+    with TRAVA:
+        JOBS[jid] = {"id": jid, "estado": "fila", "etapa": "Na fila", "progresso": 0, "criado_em": time.time(),
+                     "params": {"tipo": "editor", "titulo": "Video editado"}}
+    gravar(jid)
+    FILA.put(("editor", jid, proj, p))
+    return {"id": jid}
+
+
 @app.get("/jobs/{jid}")
 def ver_job(jid: str):
     if not ID_RE.fullmatch(jid) or jid not in JOBS:
@@ -462,5 +609,7 @@ def baixar(jid: str, nome: str, exp: int, sig: str):
     caminho = DADOS / jid / nome
     if not caminho.is_file():
         raise HTTPException(404, "Nao encontrado.")
-    return FileResponse(caminho, media_type="video/mp4", filename=nome,
+    nome_arq = {"download": "video_baixado.mp4", "editor": "video_editado.mp4"}.get(
+        JOBS.get(jid, {}).get("params", {}).get("tipo"), nome)
+    return FileResponse(caminho, media_type="video/mp4", filename=nome_arq,
                         headers={"Cache-Control": "private, no-store"})

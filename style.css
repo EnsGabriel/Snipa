@@ -46,3 +46,4 @@ details.mod>summary::-webkit-details-marker{display:none}
 details.mod[open]>summary{color:var(--t);background:var(--c2)}
 .foto{display:none;flex-direction:column;align-items:center;gap:8px;margin:8px 0 4px;color:var(--m);font-size:12px}
 .foto img{max-width:160px;max-height:120px;border-radius:10px;border:1px solid var(--b)}
+.dl video{aspect-ratio:auto;object-fit:contain;max-height:70vh}

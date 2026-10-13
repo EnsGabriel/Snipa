@@ -19,10 +19,11 @@ async function api(path,opt={}){
 
 // ===== Rotas e navegação =====
 let timer=null;
-const rotas={live:vLive,novo:vNovo,projetos:vProjetos,job:vJob};
+const rotas={live:vLive,novo:vNovo,baixar:vBaixar,video:vVideo,projetos:vProjetos,job:vJob};
 function ir(){clearInterval(timer);const[,r,id]=location.hash.split("/");const n=rotas[r]?r:"novo";
-  $("#nav").replaceChildren(...[["novo","✂","Novo"],["projetos","▤","Projetos"],["live","●","Live"]]
-    .map(([k,ic,t])=>h("a",{href:"#/"+k,className:k===n?"on":""},h("b",{},ic),t)));
+  $("#nav").replaceChildren(...[["novo","✂","Novo"],["baixar","⬇","Baixar"],["projetos","▤","Projetos"],["live","●","Live"]]
+    .map(([k,ic,t])=>h("a",{href:"#/"+k,className:k===n?"on":""},h("b",{},ic),t)),
+    h("a",{href:"editor.html"},h("b",{},"🎞"),"Editor"));
   $("#app").replaceChildren();rotas[n](id)}
 addEventListener("hashchange",ir);
 
@@ -98,8 +99,8 @@ function vNovo(){
     ly.painel,
     h("p",{className:"s m",style:"text-align:center"},"Para vídeos grandes, prefira colar o link."),
     L.length?h("h3",{style:"margin-top:40px"},"Seus projetos recentes"):"",
-    h("div",{className:"cards"},L.slice(0,6).map(p=>h("a",{className:"card",href:"#/job/"+p.id},
-      h("b",{},p.titulo),h("span",{className:"s"},p.cortes+" cortes · "+new Date(p.quando).toLocaleDateString("pt-BR"))))))}
+    h("div",{className:"cards"},L.slice(0,6).map(p=>h("a",{className:"card",href:(p.tipo==="download"?"#/video/":"#/job/")+p.id},
+      h("b",{},p.titulo),h("span",{className:"s"},(p.tipo==="download"?"vídeo completo":p.cortes+" cortes")+" · "+new Date(p.quando).toLocaleDateString("pt-BR"))))))}
 
 // ===== Cartão de corte =====
 function cardClip(c){const u=base()+c.url;
@@ -201,14 +202,43 @@ function vJob(id){
       grade.replaceChildren(...j.clips.map((c,n)=>cardJob(id,c,n)))}}
   tick();timer=setInterval(tick,3000)}
 
+// ===== Página: Baixar vídeo completo =====
+function vBaixar(){
+  const msg=h("p",{className:"err",style:"text-align:center"});
+  const url=h("input",{placeholder:"Cole o link do vídeo (TikTok, Instagram, YouTube e outros)"});
+  const go=h("button",{className:"cta",textContent:"Baixar vídeo",on:{click:async()=>{
+    msg.textContent="";if(!url.value.trim()){msg.textContent="Cole um link.";return}
+    const fd=new FormData();fd.append("url",url.value.trim());go.disabled=true;
+    try{const r=await api("/downloads",{method:"POST",body:fd});
+      const L=store.get("jobs",[]);let t;try{t=new URL(url.value).hostname}catch{t="vídeo"}
+      L.unshift({id:r.id,titulo:t,quando:Date.now(),tipo:"download"});store.set("jobs",L.slice(0,30));
+      location.hash="#/video/"+r.id}catch(e){msg.textContent=e.message;go.disabled=false}}}});
+  $("#app").append(h("div",{className:"hero"},h("div",{className:"tag"},"// BAIXAR VÍDEO COMPLETO"),
+      h("h1",{},"Cole um link.",h("br"),"Baixe o vídeo ",h("b",{style:"color:var(--p)"},"inteiro."))),
+    h("div",{className:"pill"},url,go),msg,
+    h("p",{className:"s m",style:"text-align:center"},"Use só com vídeos seus ou que você tem permissão para baixar e usar."))}
+
+function vVideo(id){
+  const topo=h("div",{className:"m"}),erro=h("p",{className:"err"}),area=h("div",{style:"max-width:640px"});
+  $("#app").append(h("h2",{},"Seu vídeo"),topo,erro,area,h("p",{className:"s m"},"O arquivo é apagado do servidor após 24 horas."));
+  async function tick(){let j;try{j=await api("/jobs/"+id)}catch(e){erro.textContent=e.message;return}
+    erro.textContent="";
+    if(j.estado==="erro"){topo.textContent="";erro.textContent=j.erro||"Falhou.";clearInterval(timer);return}
+    if(j.estado!=="concluido"){topo.textContent=(j.etapa||"Na fila")+"…";return}
+    clearInterval(timer);topo.textContent="Pronto!";const c=j.clips[0],u=base()+c.url;
+    area.replaceChildren(h("div",{className:"clip dl"},h("video",{src:u,controls:true,preload:"metadata"}),
+      h("div",{className:"s m"},Math.round(c.fim)+" s"),
+      h("a",{className:"btn pr",href:u,textContent:"Baixar",style:"width:100%;margin-top:8px"})))}
+  tick();timer=setInterval(tick,3000)}
+
 // ===== Página: Meus projetos =====
 function vProjetos(){
   const L=store.get("jobs",[]);const box=h("div");
   $("#app").append(h("h2",{},"Meus projetos"),h("p",{className:"s m"},"Neste navegador. Clipes são apagados do servidor após 24 horas."),box);
   if(!L.length)box.append(h("p",{className:"m"},"Nenhum projeto ainda."));
   L.forEach(p=>box.append(h("div",{className:"item"},
-    h("div",{},h("b",{},p.titulo),h("div",{className:"s m"},p.cortes+" cortes · "+new Date(p.quando).toLocaleString("pt-BR"))),
-    h("div",{},h("a",{className:"btn",href:"#/job/"+p.id,textContent:"Abrir"})," ",
+    h("div",{},h("b",{},p.titulo),h("div",{className:"s m"},(p.tipo==="download"?"vídeo completo":p.cortes+" cortes")+" · "+new Date(p.quando).toLocaleString("pt-BR"))),
+    h("div",{},h("a",{className:"btn",href:(p.tipo==="download"?"#/video/":"#/job/")+p.id,textContent:"Abrir"})," ",
       h("button",{textContent:"Apagar",on:{click:async()=>{try{await api("/jobs/"+p.id,{method:"DELETE"})}catch{}
         store.set("jobs",store.get("jobs",[]).filter(x=>x.id!==p.id));ir()}}})))))}
 // ===== Início =====
